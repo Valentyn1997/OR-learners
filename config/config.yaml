@@ -1,0 +1,136 @@
+# Dataset for training / evaluation -- specific values should be filled for each dataset
+dataset:
+  name: ???
+  collection: False                 # True for acic_2016 and acic_2018
+  train_test_splitted: False
+  oracle_available: False
+  test_size: 0.15                    # train/test split ratio
+  n_shuffle_splits: 1
+  dataset_ix:                       # dataset index
+  dim_cov: ???
+  extra_hid_multiplier:
+
+# Model specific parameters
+repr_net:
+  dim_repr_multiplier:
+  repr_net_type: dense              # dense | res_flow | cnf
+  repr_net_hid_layers: 1
+  mu_net_type: ???                  # tnet | snet
+  mu_net_hid_layers: 1
+  has_prop_net_cov: False
+  has_prop_net_repr: False
+  q_trunc: 0.05
+
+  # Tunable hparams (some with default values)
+  dim_hid1_multiplier: 1.0
+  dim_hid2_multiplier: 1.0
+  lr:
+  batch_size:
+  wd:
+
+  tune_hparams: False
+  tune_type: choice
+  hparams_grid:
+  tune_range:
+  num_epochs: 200
+
+
+prop_net_cov:
+  _target_: src.models.PropNet
+
+  # Tunable hparams (some with default values)
+  dim_hid1_multiplier:
+  hid_layers: 1
+  lr:
+  batch_size:
+  wd:
+
+  tune_hparams: False
+  tune_type: choice
+  tune_range: 50
+  num_epochs: 200
+  hparams_grid:
+    lr:
+      - 0.001
+      - 0.005
+      - 0.01
+    batch_size:
+      - 32
+      - 64
+      - 128
+    wd:
+      - 0.0
+      - 0.001
+      - 0.01
+      - 0.1
+    dim_hid1_multiplier:
+      - 1.0
+      - 1.5
+      - 2.0
+
+mu_net_cov:
+  _target_: src.models.MuNet
+  mu_net_type: ${repr_net.mu_net_type}
+  use_repr_pred: False
+
+  # Tunable hparams (some with default values)
+  dim_hid1_multiplier:
+  hid_layers: 1
+  lr:
+  batch_size:
+  wd:
+
+  tune_hparams: False
+  tune_type: choice
+  tune_range: 50
+  num_epochs: 200
+  hparams_grid:
+    lr:
+      - 0.001
+      - 0.005
+      - 0.01
+    batch_size:
+      - 32
+      - 64
+      - 128
+    wd:
+      - 0.0
+      - 0.001
+      - 0.01
+      - 0.1
+    dim_hid1_multiplier:
+      - 1.0
+      - 1.5
+      - 2.0
+
+
+target_net:
+  _target_: src.models.TargetNet
+
+  lr: 0.005
+  batch_size: 64
+  hid_layers: 1
+  num_epochs: 200
+  gamma: 0.995                  # EMA of model weights for target
+  dim_hid1_multiplier: ${repr_net.dim_hid2_multiplier}
+
+  tune_hparams: False             # Done jointly with the repr_net
+
+
+exp:
+  seed: 10
+  device: cuda
+  logging: True
+  plotting: False
+  save_results: False
+  mlflow_uri: http://127.0.0.1:5000  # MlFlow server is located on 138.246.237.244
+  target_inp: repr   # repr | cov | out
+  targets:
+    - cate
+
+
+# Hydra defaults
+defaults:
+  - _self_
+  - override hydra/hydra_logging: colorlog
+  - override hydra/job_logging: colorlog
