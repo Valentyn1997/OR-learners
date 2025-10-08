@@ -81,10 +81,11 @@ Stage 1 models are propensity networks (src/models/prop_nets.py) and outcome net
 
 #### Stage 2.
 Stage 2 models are defined in config/config.yaml and src/models/target_net.py. One needs to specify the list of second-stage models to fit for `exp.targets`:
-- CAPOs estimation with $\hat{\mathcal{L}}_{\xi_a}(g, \hat{\eta})$ (DR-learner): `exp.targets="['mu0', 'mu1']"`
-- CAPOs estimation with $\hat{\mathcal{L}}_{Y[a]}(g, \hat{\eta})$ (DR-learner): `exp.targets="['y0', 'y1']"`
-- CATE estimation with $\hat{\mathcal{L}}_{\tau}(g, \hat{\eta})$ (DR-learner): `exp.targets="['cate']"`
-- CATE estimation with $\hat{\mathcal{L}}_{\pi_0\pi_1\tau}(g, \hat{\eta})$ (R-learner): `exp.targets="['rcate']"`
+- CAPOs estimation with $\text{DR}^{\text{K}}_a$-learner: `exp.targets="['mu0', 'mu1']"`
+- CAPOs estimation with $$\text{DR}^{\text{FS}}_a$-learner: `exp.targets="['y0', 'y1']"`
+- CATE estimation with $\text{DR}^{\text{K}}$: `exp.targets="['cate']"`
+- CATE estimation with $\text{R}$: `exp.targets="['rcate']"`
+- CATE estimation with $\text{IVW}$: `exp.targets="['ivw_pi_cate']"`
 
 
 ### Examples
