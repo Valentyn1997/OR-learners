@@ -3,7 +3,8 @@ Orthogonal representation learning for CATE estimation
 
 A novel class of Neyman-orthogonal learners for causal quantities defined at the representation level
 
-![image](https://github.com/user-attachments/assets/c5d6da01-b2b5-412f-9bbb-6d3c74a0e33a)
+<img width="1669" height="374" alt="image" src="https://github.com/user-attachments/assets/18e716c6-35ed-424d-99bc-6e3a990bbc1f" />
+
 
 The project is built with the following Python libraries:
 1. [PyTorch](https://pytorch.org/)
