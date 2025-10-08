@@ -236,7 +236,7 @@ class BaseRepresentationNet(BaseNet):
             pseudo_out = ipwt0 * (out_f - mu_pred0) + mu_pred0
         elif target == 'mu1':
             pseudo_out = ipwt1 * (out_f - mu_pred1) + mu_pred1
-        elif target == 'cate':
+        elif target in ['cate', 'ivw_pi_cate', 'ivw_a_cate']:
             pseudo_out = ipwt1 * (out_f - mu_pred1) + mu_pred1 - (ipwt0 * (out_f - mu_pred0) + mu_pred0)
         else:
             raise NotImplementedError()

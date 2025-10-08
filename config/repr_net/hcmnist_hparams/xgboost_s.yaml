@@ -1,0 +1,15 @@
+# @package _global_
+prop_model_cov:
+  n_estimators: 100
+  max_depth: 6
+  reg_alpha: 40
+  min_child_weight: 9
+  gamma: 1
+
+mu_model_cov:
+  n_estimators: 150
+  max_depth: 12
+  reg_alpha: 40
+  min_child_weight: 3
+  gamma: 1
+  mu_model_type: s

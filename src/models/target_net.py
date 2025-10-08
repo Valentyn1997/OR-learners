@@ -22,7 +22,7 @@ class TargetNet(BaseNet):
         super(TargetNet, self).__init__(args, mlflow_logger)
 
         self.target = target
-        assert target in ['cate', 'mu0', 'mu1', 'y0', 'y1', 'rcate']
+        assert target in ['cate', 'mu0', 'mu1', 'y0', 'y1', 'rcate', 'ivw_pi_cate', 'ivw_a_cate']
 
         self.out_scaler = StandardScaler()
 
@@ -74,24 +74,33 @@ class TargetNet(BaseNet):
         self.num_train_iter = int(self.hparams.dataset.n_samples_train / self.batch_size * self.num_epochs)
         logger.info(f'Effective number of training iterations: {self.num_train_iter}.')
 
-        if self.target in ['cate', 'mu0', 'mu1']:
+        if 'prop_pred_cov' in data_dict:
+            prop_pred = torch.tensor(data_dict['prop_pred_cov'].reshape(-1, 1)).float()
+        else:
+            prop_pred = torch.tensor(data_dict['prop_pred_repr'].reshape(-1, 1)).float()
+
+        prop_pred = 1 - prop_pred if self.target == 'y0' else prop_pred
+
+        out_f = self.out_scaler.fit_transform(data_dict['out_f'].reshape(-1, 1))
+        _, treat_f, out_f = self.prepare_tensors(None, data_dict['treat_f'], out_f)
+
+        if 'mu_pred0_cov' in data_dict:
+            mu0_pred = torch.tensor(data_dict['mu_pred0_cov'].reshape(-1, 1)).float()
+            mu1_pred = torch.tensor(data_dict['mu_pred1_cov'].reshape(-1, 1)).float()
+        else:
+            mu0_pred = torch.tensor(data_dict['mu_pred0_repr'].reshape(-1, 1)).float()
+            mu1_pred = torch.tensor(data_dict['mu_pred1_repr'].reshape(-1, 1)).float()
+
+        mu_pred = mu0_pred if self.target == 'y0' else mu1_pred
+
+        if self.target in ['cate', 'mu0', 'mu1', 'ivw_pi_cate', 'ivw_a_cate']:
             pseudo_out = torch.tensor(data_dict[f'pseudo_{self.target}']).float()
-            return inp_f, pseudo_out
+            return inp_f, pseudo_out, treat_f, out_f, prop_pred, mu0_pred, mu1_pred
         elif self.target in ['y0', 'y1', 'rcate']:
-            prop_pred_cov = torch.tensor(data_dict['prop_pred_cov'].reshape(-1, 1)).float()
-            prop_pred_cov = 1 - prop_pred_cov if self.target == 'y0' else prop_pred_cov
-
-            out_f = self.out_scaler.fit_transform(data_dict['out_f'].reshape(-1, 1))
-            _, treat_f, out_f = self.prepare_tensors(None, data_dict['treat_f'], out_f)
-
-            mu0_pred_cov = torch.tensor(data_dict['mu_pred0_cov'].reshape(-1, 1)).float()
-            mu1_pred_cov = torch.tensor(data_dict['mu_pred1_cov'].reshape(-1, 1)).float()
-            mu_pred_cov = mu0_pred_cov if self.target == 'y0' else mu1_pred_cov
-
             if self.target in ['y0', 'y1']:
-                return inp_f, treat_f, out_f, prop_pred_cov, mu_pred_cov
+                return inp_f, treat_f, out_f, prop_pred, mu_pred
             else:
-                return inp_f, treat_f, out_f, prop_pred_cov, mu0_pred_cov, mu1_pred_cov
+                return inp_f, treat_f, out_f, prop_pred, mu0_pred, mu1_pred
         else:
             raise NotImplementedError()
 
@@ -135,9 +144,9 @@ class TargetNet(BaseNet):
         return optimizer, ema_target
 
     def fit(self, train_data_dict: dict, log: bool, kind='pseudo'):
-        if self.target in ['cate', 'mu0', 'mu1']:
-            inp_f, pseudo_out = self.prepare_train_data(train_data_dict)
-            train_dataloader = self.get_train_dataloader(inp_f, pseudo_out)
+        if self.target in ['cate', 'mu0', 'mu1', 'ivw_pi_cate', 'ivw_a_cate']:
+            inp_f, pseudo_out, treat_f, out_f, prop_pred_cov, mu0_pred_cov, mu1_pred_cov = self.prepare_train_data(train_data_dict)
+            train_dataloader = self.get_train_dataloader(inp_f, pseudo_out, treat_f, out_f, prop_pred_cov, mu0_pred_cov, mu1_pred_cov)
         elif self.target in ['y0', 'y1']:
             inp_f, treat_f, out_f, prop_pred_cov, mu_pred_cov = self.prepare_train_data(train_data_dict)
             train_dataloader = self.get_train_dataloader(inp_f, treat_f, out_f, prop_pred_cov, mu_pred_cov)
@@ -150,8 +159,8 @@ class TargetNet(BaseNet):
         optimizer, self.ema_target = self.get_optimizer()
 
         for step in tqdm(range(self.num_train_iter)) if log else range(self.num_train_iter):
-            if self.target in ['cate', 'mu0', 'mu1']:
-                inp_f, pseudo_out = next(iter(train_dataloader))
+            if self.target in ['cate', 'mu0', 'mu1', 'ivw_pi_cate', 'ivw_a_cate']:
+                inp_f, pseudo_out, treat_f, out_f, prop_pred_cov, mu0_pred_cov, mu1_pred_cov = next(iter(train_dataloader))
             elif self.target in ['y0', 'y1']:
                 inp_f, treat_f, out_f, prop_pred_cov, mu_pred_cov = next(iter(train_dataloader))
             elif self.target in ['rcate']:
@@ -176,6 +185,14 @@ class TargetNet(BaseNet):
                 mu_pred_cov = prop_pred_cov * mu1_pred_cov + (1 - prop_pred_cov) * mu0_pred_cov
                 loss = (((out_f - mu_pred_cov) - (treat_f - prop_pred_cov) * pred) ** 2).mean()
                 log_dict = {f'train_rloss_target': loss.item()}
+            elif self.target in ['ivw_a_cate']:
+                overlap_eff = (treat_f - prop_pred_cov) ** 2
+                loss = (overlap_eff * (pred - pseudo_out) ** 2).mean()
+                log_dict = {f'train_wmse_target': loss.item()}
+            elif self.target in ['ivw_pi_cate']:  # Not Neyman-orthogonal!!
+                overlap = prop_pred_cov * (1 - prop_pred_cov)
+                loss = (overlap * (pred - pseudo_out) ** 2).mean()
+                log_dict = {f'train_wmse_target': loss.item()}
             else:
                 raise NotImplementedError()
             loss.backward()

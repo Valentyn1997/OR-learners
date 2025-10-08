@@ -51,7 +51,11 @@ def main(args: DictConfig):
         for i, (train_data_dict, test_data_dict) in enumerate(data_dicts):
 
             # ================= Mlflow init =================
-            experiment_name = f'{args.repr_net.name}/{args.dataset.name}/{args.repr_net.repr_net_type}'
+            experiment_name = f'{args.repr_net.name}/{args.dataset.name}_new/{args.repr_net.repr_net_type}'
+
+            if 'alpha' in args.repr_net and args.repr_net.alpha > 0.0:
+                experiment_name += '_0.1'
+
             mlflow_logger = MLFlowLogger(experiment_name=experiment_name,
                                          tracking_uri=args.exp.mlflow_uri) if args.exp.logging else None
 
@@ -68,7 +72,7 @@ def main(args: DictConfig):
 
                 # Finetuning for the first split
                 if args.prop_net_cov.tune_hparams and i == 0:
-                    prop_net_cov.finetune(train_data_dict, {'cpu': 0.1, 'gpu': 0.24})
+                    prop_net_cov.finetune(train_data_dict, {'cpu': 0.1, 'gpu': 0.1})
 
                 # Training
                 logger.info(f'Fitting propensity net for sub-dataset {args.dataset.dataset_ix}.')
@@ -86,7 +90,7 @@ def main(args: DictConfig):
 
             # Finetuning for the first split
             if args.repr_net.tune_hparams and i == 0:
-                repr_net.finetune(train_data_dict, {'cpu': 0.1, 'gpu': 0.24})
+                repr_net.finetune(train_data_dict, {'cpu': 0.1, 'gpu': 0.1})
 
             # Training
             logger.info(f'Fitting a representation net for sub-dataset {args.dataset.dataset_ix}.')
@@ -121,7 +125,7 @@ def main(args: DictConfig):
 
                     # Finetuning for the first split
                     if args.prop_net_cov.tune_hparams and i == 0:
-                        prop_net_cov.finetune(train_data_dict, {'cpu': 0.1, 'gpu': 0.24})
+                        prop_net_cov.finetune(train_data_dict, {'cpu': 0.1, 'gpu': 0.1})
 
                     # Training
                     logger.info(f'Fitting propensity net for sub-dataset {args.dataset.dataset_ix}.')
@@ -140,7 +144,7 @@ def main(args: DictConfig):
 
                     # Finetuning for the first split
                     if args.mu_net_cov.tune_hparams and i == 0:
-                        mu_net_cov.finetune(train_data_dict, {'cpu': 0.1, 'gpu': 0.24})
+                        mu_net_cov.finetune(train_data_dict, {'cpu': 0.1, 'gpu': 0.1})
 
                     # Training
                     logger.info(f'Fitting mu-net for sub-dataset {args.dataset.dataset_ix}.')
@@ -165,7 +169,7 @@ def main(args: DictConfig):
                     continue
                 else:
                     # ================= Generating pseudo-outcomes =================
-                    if target in ['mu0', 'mu1', 'cate']:
+                    if target in ['mu0', 'mu1', 'cate', 'ivw_pi_cate', 'ivw_a_cate']:
                         train_data_dict[f'pseudo_{target}'] = repr_net.get_pseudo_out(data_dict=train_data_dict, target=target)
 
                     # ================= Fitting a target net =================
@@ -177,7 +181,7 @@ def main(args: DictConfig):
                         results_in = target_net.evaluate_pot_mse(data_dict=train_data_dict, log=args.exp.logging, prefix='in_target', target=target)
                         results_out = target_net.evaluate_pot_mse(data_dict=test_data_dict, log=args.exp.logging, prefix='out_target', target=target)
 
-                    elif target in ['cate', 'rcate']:
+                    elif target in ['cate', 'rcate', 'ivw_pi_cate', 'ivw_a_cate']:
                         results_in = target_net.evaluate_pehe(data_dict=train_data_dict, log=args.exp.logging, prefix='in_target', target=target)
                         results_out = target_net.evaluate_pehe(data_dict=test_data_dict, log=args.exp.logging, prefix='out_target', target=target)
                     else:

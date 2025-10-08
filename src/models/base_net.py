@@ -92,7 +92,7 @@ class BaseNet(torch.nn.Module):
 
         hparams_grid = {k: getattr(tune, self.hparams[self.name]['tune_type'])(list(v))
                         for k, v in self.hparams[self.name]['hparams_grid'].items()}
-        torch.set_default_device('cuda:0')
+        torch.set_default_device('cuda')
         analysis = tune.run(tune.with_parameters(fit_eval_kfold,
                                                  model_cls=self.__class__,
                                                  train_data_dict=deepcopy(train_data_dict),

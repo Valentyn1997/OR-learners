@@ -20,23 +20,37 @@ class MuNet(BaseNet):
     def __init__(self, args: DictConfig = None, mlflow_logger: MLFlowLogger = None, **kwargs):
         super(MuNet, self).__init__(args, mlflow_logger)
 
-        self.dim_hid1 = args[self.name].dim_hid1 = int(args[self.name].dim_hid1_multiplier * args.dataset.extra_hid_multiplier *
-                                                       self.dim_cov)
-        self.hid_layers = args[self.name].hid_layers
-        self.wd = args[self.name].wd
+        self.num_epochs = args.repr_net.num_epochs
+        self.batch_size = args.repr_net.batch_size
+        self.lr = args.repr_net.lr
+        self.repr_net_type = args.repr_net.repr_net_type
+        self.repr_net_hid_layers = args.repr_net.repr_net_hid_layers
+        self.mu_net_type = args.repr_net.mu_net_type
+        self.mu_net_hid_layers = args.repr_net.mu_net_hid_layers
+
+        self.dim_hid1 = args.repr_net.dim_hid1 = int(args.repr_net.dim_hid1_multiplier * args.dataset.extra_hid_multiplier *
+                                                     self.dim_cov)
+        self.dim_repr = args.repr_net.dim_repr = int(args.repr_net.dim_repr_multiplier * self.dim_cov)
+        self.dim_hid2 = args.repr_net.dim_hid2 = int(args.repr_net.dim_hid2_multiplier * args.dataset.extra_hid_multiplier *
+                                                     self.dim_repr)
+        self.wd = args.repr_net.wd
 
         self.out_scaler = StandardScaler()
 
-        self.mu_net_type = args.mu_net_cov.mu_net_type
+        # Representation net init
+        self.repr_nn = DenseNN(self.dim_cov, self.repr_net_hid_layers * [self.dim_hid1], param_dims=[self.dim_repr],
+                                   nonlinearity=torch.nn.ELU()).float()
 
         # Mu net init
         if self.mu_net_type == 'tnet':
-            self.mu_nn = torch.nn.ModuleList([DenseNN(self.dim_cov, self.hid_layers * [self.dim_hid1], param_dims=[1],
-                                                  nonlinearity=torch.nn.ELU()).float() for _ in self.treat_options])
+            self.mu_nn = torch.nn.ModuleList([DenseNN(self.dim_repr, self.mu_net_hid_layers * [self.dim_hid2], param_dims=[1],
+                                                      nonlinearity=torch.nn.ELU()).float() for _ in self.treat_options])
         elif self.mu_net_type == 'snet':
-            self.mu_nn = DenseNN(self.dim_cov + 1, self.hid_layers * [self.dim_hid1], param_dims=[1], nonlinearity=torch.nn.ELU()).float()
+            self.mu_nn = DenseNN(self.dim_repr + 1, self.mu_net_hid_layers * [self.dim_hid2], param_dims=[1],
+                                 nonlinearity=torch.nn.ELU()).float()
         else:
             raise NotImplementedError()
+
         self.to(self.device)
 
     def prepare_train_data(self, data_dict: dict):
@@ -70,9 +84,9 @@ class MuNet(BaseNet):
 
     def forward_train(self, repr_f, treat_f, out_f, cov_f, prefix='train'):
         if self.mu_net_type == 'tnet':
-            mu_pred = torch.stack([(treat_f == t) * self.mu_nn[int(t)](cov_f) for t in self.treat_options], dim=0).sum(0)
+            mu_pred = torch.stack([(treat_f == t) * self.mu_nn[int(t)](repr_f) for t in self.treat_options], dim=0).sum(0)
         elif self.mu_net_type == 'snet':
-            context_f = torch.cat([cov_f, treat_f], dim=1)
+            context_f = torch.cat([repr_f, treat_f], dim=1)
             mu_pred = self.mu_nn(context_f)
         else:
             raise NotImplementedError()
@@ -83,12 +97,12 @@ class MuNet(BaseNet):
         results = {f'{prefix}_mse_mu_net_cov': mse.item()}
         return mse, results
 
-    def forward_eval(self, cov_f):
+    def forward_eval(self, repr_f):
         if self.mu_net_type == 'tnet':
-            mu_pred_0, mu_pred_1 = self.mu_nn[0](cov_f), self.mu_nn[1](cov_f)
+            mu_pred_0, mu_pred_1 = self.mu_nn[0](repr_f), self.mu_nn[1](repr_f)
         elif self.mu_net_type == 'snet':
-            context_0 = torch.cat([cov_f, torch.zeros((cov_f.shape[0], 1))], dim=1)
-            context_1 = torch.cat([cov_f, torch.ones((cov_f.shape[0], 1))], dim=1)
+            context_0 = torch.cat([repr_f, torch.zeros((repr_f.shape[0], 1))], dim=1)
+            context_1 = torch.cat([repr_f, torch.ones((repr_f.shape[0], 1))], dim=1)
             mu_pred_0, mu_pred_1 = self.mu_nn(context_0), self.mu_nn(context_1)
         else:
             raise NotImplementedError()
@@ -103,7 +117,8 @@ class MuNet(BaseNet):
             cov_f, treat_f, out_f = next(iter(train_dataloader))
             optimizer.zero_grad()
 
-            loss, log_dict = self.forward_train(None, treat_f, out_f, cov_f, prefix='train')
+            repr_f = self.repr_nn(cov_f)
+            loss, log_dict = self.forward_train(repr_f, treat_f, out_f, None, prefix='train')
             loss.backward()
 
             optimizer.step()
@@ -116,7 +131,8 @@ class MuNet(BaseNet):
 
         self.eval()
         with torch.no_grad():
-            _, log_dict = self.forward_train(None, treat_f, out_f, cov_f, prefix=prefix)
+            repr_f = self.repr_nn(cov_f)
+            _, log_dict = self.forward_train(repr_f, treat_f, out_f, None, prefix=prefix)
             log_dict[f'{prefix}_rmse'] = np.sqrt(log_dict[f'{prefix}_mse_mu_net_cov'])
 
         if log:
@@ -129,5 +145,6 @@ class MuNet(BaseNet):
 
         self.eval()
         with torch.no_grad():
-            mu_pred0, mu_pred1 = self.forward_eval(cov_f)
+            repr_f = self.repr_nn(cov_f)
+            mu_pred0, mu_pred1 = self.forward_eval(repr_f)
         return mu_pred0.cpu().numpy(), mu_pred1.cpu().numpy()

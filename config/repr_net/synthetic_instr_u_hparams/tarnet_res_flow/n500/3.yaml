@@ -1,0 +1,14 @@
+# @package _global_
+repr_net:
+  repr_net_type: res_flow
+  repr_net_hid_layers: 3
+  mu_net_hid_layers: 1
+  dim_repr_multiplier: 1.0
+  dim_hid1_multiplier: 1.0
+  dim_hid2_multiplier: 2.0
+  lr: 0.01
+  wd: 0.01
+  batch_size: 32
+dataset:
+  n_samples_train: 500
+  instrument: u

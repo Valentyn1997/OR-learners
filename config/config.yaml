@@ -124,9 +124,10 @@ exp:
   plotting: False
   save_results: False
   mlflow_uri: http://127.0.0.1:5000  # MlFlow server is located on 138.246.237.244
-  target_inp: repr   # repr | cov | out
+  target_inp: repr   # repr | cov | out | cov_repr
   targets:
-    - cate
+    - ivw_pi_cate
+    - ivw_a_cate
 
 
 # Hydra defaults

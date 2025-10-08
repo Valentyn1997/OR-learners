@@ -21,7 +21,9 @@ def fit_eval_kfold(args: dict, orig_hparams: DictConfig, model_cls, train_data_d
     new_params = deepcopy(orig_hparams)
     model_cls.set_hparams(new_params[name], args)
     model_cls.set_subnet_hparams(new_params[subnet_name], args) if subnet_name is not None else None
-    new_params.exp.device = 'cpu'  # Tuning only with cpu
+    # new_params.exp.device = 'cuda:0'  # Tuning only with cpu
+
+    torch.set_default_device('cuda')
 
     if val_data_dict is None:  # KFold hparam tuning
         kf = KFold(n_splits=5, random_state=orig_hparams.exp.seed, shuffle=True)
