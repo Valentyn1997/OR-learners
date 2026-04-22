@@ -1,7 +1,8 @@
-Orthogonal representation learning for CATE estimation  
+Orthogonal Representation Learning for Estimating Causal Quantities  
 ==============================
+[![arXiv](https://img.shields.io/badge/arXiv-2306.01424-b31b1b.svg)](https://arxiv.org/abs/2502.04274)
 
-A novel class of Neyman-orthogonal learners for causal quantities defined at the representation level
+Neyman-orthogonal learners for causal quantities (CAPOs/CATE) defined at the representation level
 
 <img width="1669" height="374" alt="image" src="https://github.com/user-attachments/assets/18e716c6-35ed-424d-99bc-6e3a990bbc1f" />
 
@@ -10,13 +11,12 @@ The project is built with the following Python libraries:
 1. [PyTorch](https://pytorch.org/)
 2. [Hydra](https://hydra.cc/docs/intro/) - simplified command line arguments management
 3. [MlFlow](https://mlflow.org/) - experiments tracking
-4. [normflows](https://github.com/VincentStimper/normalizing-flows) - a PyTorch package for normalizing flows
 
 
 ## Setup
 
 ### Installations
-First one needs to make the virtual environment and install all the requirements:
+First, one needs to make the virtual environment and install all the requirements:
 ```console
 pip3 install virtualenv
 python3 -m virtualenv -p python3 --always-copy venv
@@ -25,11 +25,11 @@ pip3 install -r requirements.txt
 ```
 
 ### MlFlow Setup / Connection
-To start an experiments server, run: 
+To start an experiment server, run: 
 
 `mlflow server --port=5000 --gunicorn-opts "--timeout 280"`
 
-To access the MlFLow web UI with all the experiments, connect via ssh:
+To access the MLFlow web UI with all the experiments, connect via SSH:
 
 `ssh -N -f -L localhost:5000:localhost:5000 <username>@<server-link>`
 
